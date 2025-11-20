@@ -45,6 +45,12 @@ sgPyQt=SalomePyQt.SalomePyQt()
 
 translate=QCoreApplication.translate
 
+debug_threads = False
+#To show messages of error without modifying the script 
+#We run SALOME with export SALOME_VERBOSE = 1
+verbose = os.getenv("SALOME_VERBOSE")
+if verbose and int(verbose) > 0:
+  debug_threads = True
 
 class BooleanMeshAlgorithm(str, Enum):
     CGAL = 'CGAL'
@@ -138,7 +144,7 @@ def getTmpFileName(suffix=None, prefix=None):
 
 
 def runAlgo(algo, operator, mesh_left, mesh_right, result_file):
-  print("in runAlgo")
+  if debug_threads : print("in runAlgo")
   if algo == BooleanMeshAlgorithm.VTK :
     p = exec_vtk.VTK_main(operator, mesh_left, mesh_right, result_file)
   elif algo == BooleanMeshAlgorithm.IRMB :
@@ -173,20 +179,20 @@ class Worker(QObject):
     self.returncode = None
 
   def task(self):
-    print("start worker.task")
+    if debug_threads : print("start worker.task")
     try:
-      print("try worker.task")
+      if debug_threads : print("try worker.task")
       if not self._isRunning:
         return
-      print("before runAlgo")
+      if debug_threads : print("before runAlgo")
       self.process = runAlgo(self.algo, self.operator, self.mesh_left, self.mesh_right, self.result_file)
-      print("in worker.task, self.process:", self.process)
+      if debug_threads : print("in worker.task, self.process:", self.process)
       #check if there is a process to call wait
       if self.process is not None:
         #wait called to wait the end of the process
-        print("before wait")
+        if debug_threads : print("before wait")
         self.returncode = self.process.wait()
-        print("after wait")
+        if debug_threads : print("after wait")
       if self._isRunning:
         self.finished.emit(self.result_file)
     except Exception as e:
@@ -194,16 +200,16 @@ class Worker(QObject):
 
   #stop method to kill the process with the cancel button
   def stop(self):
-    print("in worker.stop()")
+    if debug_threads : print("in worker.stop()")
     self._isRunning= False
     if self.process is not None:
-      print("self.process is not None => Killing process")
+      if debug_threads : print("self.process is not None => Killing process")
       try:
         self.process.kill()
-        print("Process killed")
+        if debug_threads : print("Process killed")
       except Exception as e:
-        print("Error killing process:", e)
-    print("worker.stop() end")
+        if debug_threads : print("Error killing process:", e)
+    if  debug_threads : print("worker.stop() end")
 
 class MeshBooleanDialog(Ui_MyPlugDialog,QWidget):
   """
@@ -450,7 +456,7 @@ that you selected.
 
   def PBCancelPressed(self):
     import salome
-    print("Cancel called by user")
+    if debug_threads : print("Cancel called by user")
   # check that there is a process then stop it if there is
     if self.worker is not None:
       print("Process stopped")
@@ -473,7 +479,7 @@ that you selected.
 
   def PBComputePressed(self):
     import salome
-    print("Compute  called by user")
+    if debug_threads : print("Compute  called by user")
 
     import SMESH
     from salome.kernel import studyedit
@@ -527,7 +533,7 @@ that you selected.
     import salome
     from salome.smesh import smeshBuilder
 
-    print("return code: ", self.worker.returncode)
+    if debug_threads : print("return code: ", self.worker.returncode)
     if (self.worker.returncode) != 0:
       self.restore_cursor()
       self.error_popup("Error", "Computation ended in error.")
