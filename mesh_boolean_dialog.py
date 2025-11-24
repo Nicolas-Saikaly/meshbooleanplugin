@@ -434,7 +434,7 @@ that you selected.
     self.repaint()
     sgPyQt.processEvents()
 
-# on_compute_finished fonction called with signals afterwards
+# on_compute_finished function called with signals afterwards
   def on_compute_finished(self):
     print("Computation finished")
     self.loadResult()
@@ -442,7 +442,7 @@ that you selected.
     self.update_button()
     self.restore_cursor()
 
-# update_button fonction to enable the 'Cancel' button and disable the 'Compute' one (and vice-versa)
+# update_button function to enable the 'Cancel' button and disable the 'Compute' one (and vice-versa)
   def update_button(self):
     if self.computing:
       self.PB_Compute.setEnabled(False)
@@ -532,6 +532,7 @@ that you selected.
   def loadResult(self):
     import salome
     from salome.smesh import smeshBuilder
+    from mesh_boolean_api import ConvertAlgorithmResult, ImportMedToSmesh
 
     logger.debug(f"return code: {self.worker.returncode}")
     if (self.worker.returncode) != 0:
@@ -541,44 +542,16 @@ that you selected.
 
     #see which algorithm is called to convert the appropriate result into a .med file
     algo = self.getCurrentAlgorithm()
-    if algo == BooleanMeshAlgorithm.CGAL:
-      exec_cgal.convert_result(self.result_file)
-    elif algo == BooleanMeshAlgorithm.MCUT:
-      exec_mcut.convert_result(self.result_file)
-    elif algo == BooleanMeshAlgorithm.CORK:
-      exec_cork.convert_result(self.result_file)
-    elif algo == BooleanMeshAlgorithm.IRMB:
-      exec_irmb.convert_result(self.result_file)
-    elif algo == BooleanMeshAlgorithm.IGL:
-      exec_libigl.convert_result(self.result_file)
-    elif algo == BooleanMeshAlgorithm.VTK:
-      exec_vtk.convert_result(self.result_file)
-
-    smesh = smeshBuilder.New()
-    maStudy=salome.myStudy
-    smesh.UpdateStudy()
+    #use the ConvertAlgorithmResult function from the API to avoid repeating the same code
+    ConvertAlgorithmResult(algo, self.result_file)
 
     try:
-      (outputMesh, status) = smesh.CreateMeshesFromMED(self.result_file)
+      #Use the ImportMedToSmesh function from the API
+      ImportMedToSmesh(self.result_file, operator_name = self.operator)
     except Exception as e:
       self.restore_cursor()
       return self.error_popup("Result import", e)
-    if len(outputMesh) == 0:
-      self.restore_cursor()
-      return self.error_popup("Not found", "MED result file not found.")
-    outputMesh=outputMesh[0]
-    name = ""
-    if self.operator.lower() == 'union':
-      name = self.operator + '_' + str(self.union_num)
-      self.union_num+=1
-    elif self.operator.lower() == 'intersection':
-      name = self.operator + '_' + str(self.intersection_num)
-      self.intersection_num+=1
-    else:
-      name = self.operator + '_' + str(self.difference_num)
-      self.difference_num+=1
-    smesh.SetName(outputMesh.GetMesh(), name)
-#    outputMesh.Compute() #no algorithms message for "Mesh_x" has been computed with warnings: -  global 1D algorithm is missing
+    #outputMesh.Compute() #no algorithms message for "Mesh_x" has been computed with warnings: -  global 1D algorithm is missing
 
     if salome.sg.hasDesktop():
       salome.sg.updateObjBrowser()
