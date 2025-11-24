@@ -22,6 +22,8 @@ import os, subprocess
 import tempfile
 import re
 import sys
+import logging
+from salome_utils import verbose, logger, positionVerbosityOfLogger
 from meshbooleanplugin.MyPlugDialog_ui import Ui_MyPlugDialog
 from qtsalome import *
 from PyQt5.QtCore import Qt
@@ -45,12 +47,10 @@ sgPyQt=SalomePyQt.SalomePyQt()
 
 translate=QCoreApplication.translate
 
-debug_threads = False
-#To show messages of error without modifying the script 
-#We run SALOME with export SALOME_VERBOSE = 1
-verbose = os.getenv("SALOME_VERBOSE")
-if verbose and int(verbose) > 0:
-  debug_threads = True
+#To show messages of error without modifying the script
+debug_plugin = os.getenv("DEBUG_PLUGIN")
+if debug_plugin or verbose():
+  positionVerbosityOfLogger(logging.DEBUG)
 
 class BooleanMeshAlgorithm(str, Enum):
     CGAL = 'CGAL'
@@ -144,7 +144,7 @@ def getTmpFileName(suffix=None, prefix=None):
 
 
 def runAlgo(algo, operator, mesh_left, mesh_right, result_file):
-  if debug_threads : print("in runAlgo")
+  logger.debug("in runAlgo")
   if algo == BooleanMeshAlgorithm.VTK :
     p = exec_vtk.VTK_main(operator, mesh_left, mesh_right, result_file)
   elif algo == BooleanMeshAlgorithm.IRMB :
@@ -179,20 +179,20 @@ class Worker(QObject):
     self.returncode = None
 
   def task(self):
-    if debug_threads : print("start worker.task")
+    logger.debug("start worker.task")
     try:
-      if debug_threads : print("try worker.task")
+      logger.debug("try worker.task")
       if not self._isRunning:
         return
-      if debug_threads : print("before runAlgo")
+      logger.debug("before runAlgo")
       self.process = runAlgo(self.algo, self.operator, self.mesh_left, self.mesh_right, self.result_file)
-      if debug_threads : print("in worker.task, self.process:", self.process)
+      logger.debug(f"in worker.task, self.process:{self.process}")
       #check if there is a process to call wait
       if self.process is not None:
         #wait called to wait the end of the process
-        if debug_threads : print("before wait")
+        logger.debug("before wait")
         self.returncode = self.process.wait()
-        if debug_threads : print("after wait")
+        logger.debug("after wait")
       if self._isRunning:
         self.finished.emit(self.result_file)
     except Exception as e:
@@ -200,16 +200,16 @@ class Worker(QObject):
 
   #stop method to kill the process with the cancel button
   def stop(self):
-    if debug_threads : print("in worker.stop()")
+    logger.debug("in worker.stop()")
     self._isRunning= False
     if self.process is not None:
-      if debug_threads : print("self.process is not None => Killing process")
+      logger.debug("self.process is not None => Killing process")
       try:
         self.process.kill()
-        if debug_threads : print("Process killed")
+        logger.debug("Process killed")
       except Exception as e:
-        if debug_threads : print("Error killing process:", e)
-    if  debug_threads : print("worker.stop() end")
+        logger.debug(f"Error killing process:{e}")
+    logger.debug("worker.stop() end")
 
 class MeshBooleanDialog(Ui_MyPlugDialog,QWidget):
   """
@@ -456,7 +456,7 @@ that you selected.
 
   def PBCancelPressed(self):
     import salome
-    if debug_threads : print("Cancel called by user")
+    logger.debug("Cancel called by user")
   # check that there is a process then stop it if there is
     if self.worker is not None:
       print("Process stopped")
@@ -479,7 +479,7 @@ that you selected.
 
   def PBComputePressed(self):
     import salome
-    if debug_threads : print("Compute  called by user")
+    logger.debug("Compute  called by user")
 
     import SMESH
     from salome.kernel import studyedit
@@ -533,7 +533,7 @@ that you selected.
     import salome
     from salome.smesh import smeshBuilder
 
-    if debug_threads : print("return code: ", self.worker.returncode)
+    logger.debug(f"return code: {self.worker.returncode}")
     if (self.worker.returncode) != 0:
       self.restore_cursor()
       self.error_popup("Error", "Computation ended in error.")
